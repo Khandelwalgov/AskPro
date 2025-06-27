@@ -5,6 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import uuid
 import werkzeug
+from parser_utils import extract_text
 
 # --- Flask App Setup ---
 app = Flask(__name__)
