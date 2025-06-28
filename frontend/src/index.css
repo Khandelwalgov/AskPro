@@ -120,12 +120,21 @@ ul {
   max-width: 60%;
 }
 .msg.user {
-  background: #cfe2ff;
-  margin-left: auto;
+  text-align: right;
+  background-color: #dcf8c6;
+  padding: 8px;
+  margin: 5px;
+  border-radius: 10px;
 }
+
 .msg.bot {
-  background: #f0f0f0;
+  text-align: left;
+  background-color: #f1f0f0;
+  padding: 8px;
+  margin: 5px;
+  border-radius: 10px;
 }
+
 .chat-input {
   display: flex;
   padding: 1rem;

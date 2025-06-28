@@ -6,6 +6,9 @@ import os
 import uuid
 import werkzeug
 from parser_utils import extract_text
+from rag_utils import load_vector_db, retrieve_chunks, chunk_and_store
+
+
 
 # --- Flask App Setup ---
 app = Flask(__name__)
@@ -112,7 +115,46 @@ def upload():
 
     db.session.add(File(filename=filename, path=save_path, mimetype=mimetype, user_id=user.id))
     db.session.commit()
+    extracted_text = extract_text(save_path, mimetype)
+    vector_folder = os.path.join('vectors', user.uuid)
+    vector_path = os.path.join(vector_folder, f"{filename}.faiss")
+    chunk_and_store(extracted_text, vector_path, metadata={"filename": filename})
+    print("Extracted text:", extracted_text[:500])  # for dev check
     return jsonify({"message": "Upload successful"})
+
+@app.route('/query', methods=['POST'])
+def query():
+    data = request.json
+    query = data.get('query')
+    uuid_input = data.get('uuid')
+
+    user = User.query.filter_by(uuid=session['uuid']).first()
+    if not user:
+        return jsonify({"error": "Invalid user"}), 400
+
+    vector_folder = os.path.join('vectors', user.uuid)
+    if not os.path.exists(vector_folder):
+        return jsonify({"error": "No vectors found"}), 400
+
+    results = []
+    for vec_file in os.listdir(vector_folder):
+        if vec_file.endswith(".faiss"):
+            vec_path = os.path.join(vector_folder, vec_file)
+            try:
+                vectordb = load_vector_db(vec_path)
+                chunk_tuples = retrieve_chunks(vectordb, query)  # returns list of (Document, score)
+                results.extend(chunk_tuples)
+            except Exception as e:
+                print(f"Error loading vector DB from {vec_path}: {e}")
+                continue
+
+    # Sort by score (lower is better with similarity_search_with_score)
+    results = sorted(results, key=lambda x: x[1])
+
+    # Extract top 10 contents
+    top_chunks = [doc.page_content for doc, score in results[:10]]
+
+    return jsonify({"chunks": top_chunks})
 
 @app.route('/list-files', methods=['GET'])
 def list_files():

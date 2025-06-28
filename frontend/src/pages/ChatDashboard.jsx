@@ -8,17 +8,47 @@ export default function ChatDashboard() {
 
   const sendQuery = async () => {
     if (!query.trim()) return;
+
+    // Show user's message
     setMessages(prev => [...prev, { role: "user", content: query }]);
     setQuery("");
 
-    const res = await fetch("http://localhost:5000/query", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    const data = await res.json();
-    setMessages(prev => [...prev, { role: "bot", content: data.response || "No answer." }]);
+    const uuid = localStorage.getItem("uuid");
+    if (!uuid) {
+      setMessages(prev => [...prev, {
+        role: "bot",
+        content: "⚠️ No user UUID found. Please log in again."
+      }]);
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/query", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, uuid })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        setMessages(prev => [...prev, { role: "bot", content: `❌ ${data.error}` }]);
+        return;
+      }
+
+      const chunks = data.chunks || [];
+      const formattedChunks = chunks.length
+        ? chunks.join("\n\n---\n\n")
+        : "No relevant chunks found.";
+
+      setMessages(prev => [...prev, { role: "bot", content: formattedChunks }]);
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: "bot",
+        content: "❌ Network or server error. Try again later."
+      }]);
+    }
   };
 
   useEffect(() => {
@@ -33,11 +63,22 @@ export default function ChatDashboard() {
       <div className="chat-container">
         <div className="chat-log" ref={logRef}>
           {messages.map((m, i) => (
-            <div key={i} className={`msg ${m.role}`}>{m.content}</div>
+            <div
+              key={i}
+              className={`msg ${m.role}`}
+              style={{ whiteSpace: 'pre-wrap' }}
+            >
+              {m.content}
+            </div>
           ))}
         </div>
         <div className="chat-input">
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ask something..." />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && sendQuery()}
+            placeholder="Ask something..."
+          />
           <button onClick={sendQuery}>Send</button>
         </div>
       </div>
