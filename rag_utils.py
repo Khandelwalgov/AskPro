@@ -6,6 +6,7 @@ from langchain.docstore.document import Document
 import os
 import pickle
 from langchain.vectorstores import FAISS
+import gc
 
 
 # Set up embeddings (Sentence Transformers)
@@ -31,12 +32,16 @@ def chunk_and_store(text, persist_path, metadata=None):
     # Save DB
     os.makedirs(os.path.dirname(persist_path), exist_ok=True)
     vector_db.save_local(persist_path)
+    del vector_db
+    gc.collect()
 
 def load_vector_db(path):
-    return FAISS.load_local(path, embedding_model, allow_dangerous_deserialization=True)
+    db= FAISS.load_local(path, embedding_model, allow_dangerous_deserialization=True)
+    return db
 
 # def retrieve_chunks(vector_db, query, k=10):
 #     results = vector_db.similarity_search(query, k=k)
 #     return [doc.page_content for doc in results]
 def retrieve_chunks(vectordb: FAISS, query: str, k: int = 10):
     return vectordb.similarity_search_with_score(query, k=k)
+import os

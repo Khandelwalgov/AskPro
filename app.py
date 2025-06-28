@@ -7,7 +7,8 @@ import uuid
 import werkzeug
 from parser_utils import extract_text
 from rag_utils import load_vector_db, retrieve_chunks, chunk_and_store
-
+import shutil
+import gc
 
 
 # --- Flask App Setup ---
@@ -153,6 +154,9 @@ def query():
 
     # Extract top 10 contents
     top_chunks = [doc.page_content for doc, score in results[:10]]
+    if vectordb:
+        del vectordb
+        gc.collect()
 
     return jsonify({"chunks": top_chunks})
 
@@ -176,13 +180,22 @@ def delete_file():
         return jsonify({"error": "File not found"}), 404
 
     try:
-        os.remove(file.path)
-    except Exception:
-        pass
+        # Delete the uploaded file (e.g., PDF)
+        if os.path.exists(file.path):
+            os.remove(file.path)
+
+        # Delete the vector folder: e.g. vectors/<uuid>/<filename>.pdf.faiss/
+        vector_folder = os.path.join('vectors', user.uuid, f"{file.filename}.faiss")
+        if os.path.exists(vector_folder):
+            shutil.rmtree(vector_folder)
+            print(f"[✓] Deleted vector folder: {vector_folder}")
+
+    except Exception as e:
+        print(f"[!] Delete error: {e}")
 
     db.session.delete(file)
     db.session.commit()
-    return jsonify({"message": "File deleted"})
+    return jsonify({"message": "File and vector index deleted"})
 
 # --- Serve React Static Build (Optional) ---
 @app.route('/', defaults={'path': ''})
